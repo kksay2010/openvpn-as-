@@ -1,0 +1,149 @@
+一、破解
+systemctl stop openvpnas
+ 
+cd /opt
+rm -rf /opt/temp 
+mkdir temp
+ 
+
+ 
+1.1
+
+cp /usr/local/openvpn_as/lib/python/pyovpn-2.0-py3.11.egg /usr/local/openvpn_as/lib/python/pyovpn-2.0-py3.11.egg.bak131
+cd temp
+mv /usr/local/openvpn_as/lib/python/pyovpn-2.0-py3.11.egg /opt/temp/pyovpn-2.0-py3.11.zip
+unzip pyovpn-2.0-py3.11.zip
+mv ./pyovpn/lic/uprop.pyc ./pyovpn/lic/uprop2.pyc
+
+
+1.2  vi ./pyovpn/lic/uprop.py
+
+from pyovpn.lic import uprop2
+old_figure = None
+ 
+def new_figure(self, licdict):
+    ret = old_figure(self, licdict)
+    ret['concurrent_connections'] = 1024
+    return ret
+ 
+for x in dir(uprop2):
+    if x[:2] == '__':
+        continue
+    if x == 'UsageProperties':
+        exec('old_figure = uprop2.UsageProperties.figure')
+        exec('uprop2.UsageProperties.figure = new_figure')
+    exec('%s = uprop2.%s' % (x, x))
+
+
+1.3
+ 
+ 
+ 
+cd ./pyovpn/lic/
+python3 -O -m compileall uprop.py && mv __pycache__/uprop.cpython-311.opt-1.pyc uprop.pyc
+rm -rf __pycache__/
+cd ../../
+rm -rf pyovpn-2.0-py3.11.zip
+zip -r 123.zip ./*
+mv 123.zip /usr/local/openvpn_as/lib/python/pyovpn-2.0-py3.11.egg
+systemctl restart openvpnas.service
+systemctl status openvpnas.service
+systemctl enable openvpnas.service
+
+
+
+
+二、配置
+
+
+2.1、 如何更改公司和LOGO
+编辑/usr/local/openvpn_as/etc/as.conf，在81行附近sa.company_name=此行后加上一行；隐藏openvpn-用户端logo，在公司名称下面一行添加
+
+
+sa.company_name=大公司
+ 
+cs.footer=hide
+ 
+cws.footer=hide
+ 
+sa.logo_image_file=/usr/local/openvpn_as/logo.png
+# 像素 664 X 175
+# 文件编码格式需改为UTF-8
+# 同时上传你的logo到/usr/local/openvpn_as/目录下即可
+
+2.2、隐藏和修改【管理员页面】右上角的版本号
+/usr/local/openvpn_as/scripts/openvpnas，修改版本号即可
+
+2.3、更改浏览器右上角，文字
+
+普通用户页面文字是 pyovpn/web/cws/index.cws.html 第18行“OpenVPN CWS”
+
+管理员页面文字是pyovpn/web/admin/html/login.html 第5行“Open*******”
+
+管理员页面 pyovpn/web/admin/html/verge.html      第5行改为  <title>大公司</title>
+
+2.4、更改管理员界面左下角 powerby
+pyovpn/web/admin/ html/verge.html
+注销掉下面代码：68、 70-74 
+
+  <img class="OpenVPN************** 3x"></img>
+
+   <p class="legal text-center" style="font-weight: normal; font-size: 10px;">-->
+                <t:transparent t:render="footer" />-->
+                           <br/>-->
+                       All Rights Reserved-->
+                     </p>
+
+
+
+2.5、网址替换 openvpn.net 替换
+2.6、图片替换
+\pyovpn-2.0-py3.6\pyovpn\web\common
+
+\pyovpn-2.0-py3.6\pyovpn\web\common\images
+
+\pyovpn-2.0-py3.6\pyovpn\web\admin\images
+
+
+
+
+三、备份还原
+3.1备份
+ 
+ 
+## which apt > /dev/null 2>&1 && apt -y install sqlite3
+which yum > /dev/null 2>&1 && yum -y install sqlite
+cd /usr/local/openvpn_as/etc/db
+[ -e config.db ]&&sqlite3 config.db .dump>/opt/bak/config.db.bak
+[ -e certs.db ]&&sqlite3 certs.db .dump>/opt/bak/certs.db.bak
+[ -e userprop.db ]&&sqlite3 userprop.db .dump>/opt/bak/userprop.db.bak
+[ -e log.db ]&&sqlite3 log.db .dump>/opt/bak/log.db.bak
+[ -e config_local.db ]&&sqlite3 config_local.db .dump>/opt/bak/config_local.db.bak
+[ -e cluster.db ]&&sqlite3 cluster.db .dump>/opt/bak/cluster.db.bak
+[ -e clusterdb.db ]&&sqlite3 clusterdb.db .dump>/opt/bak/clusterdb.db.bak
+[ -e notification.db ]&&sqlite3 notification.db .dump>/opt/bak/notification.db.bak 
+cp ../as.conf /opt/bak/as.conf.bak
+ 
+ 
+
+3.2还原
+ 
+service openvpnas stop
+##  which apt > /dev/null 2>&1 && apt -y install sqlite3
+which yum > /dev/null 2>&1 && yum -y install sqlite
+cd /usr/local/openvpn_as/etc/db
+[ -e /opt/bak/config.db.bak ]&&(rm -f config.db;sqlite3</opt/bak/config.db.bak config.db)
+[ -e /opt/bak/certs.db.bak ]&&(rm -f certs.db;sqlite3 </opt/bak/certs.db.bak certs.db)
+[ -e /opt/bak/userprop.db.bak ]&&(rm -f userprop.db;sqlite3 </opt/bak/userprop.db.bak userprop.db)
+[ -e /opt/bak/log.db.bak ]&&(rm -f log.db;sqlite3 </opt/bak/log.db.bak log.db)
+[ -e /opt/bak/config_local.db.bak ]&&(rm -f config_local.db;sqlite3 </opt/bak/config_local.db.bak config_local.db)
+[ -e /opt/bak/cluster.db.bak ]&&(rm -f cluster.db;sqlite3 </opt/bak/cluster.db.bak cluster.db)
+[ -e /opt/bak/clusterdb.db.bak ]&&(rm -f clusterdb.db;sqlite3 </opt/bak/clusterdb.db.bak clusterdb.db)
+[ -e /opt/bak/notification.db.bak ]&&(rm -f notification.db;sqlite3 </opt/bak/notification.db.bak notification.db)
+[ -e /opt/bak/as.conf.bak ]&&cp /opt/bak/as.conf.bak ../as.conf
+service openvpnas start
+
+密码还是旧密码。
+
+3.3 重新破解 和修改egg文件
+3.4 普通用户的证书 外网下载设置需要去除
